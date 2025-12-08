@@ -1,7 +1,6 @@
 const { createServer } = require("http");
 const next = require("next");
 
-// WIB timezone for cron & date formatting
 process.env.TZ = "Asia/Jakarta";
 
 const dev = process.env.NODE_ENV !== "production";
