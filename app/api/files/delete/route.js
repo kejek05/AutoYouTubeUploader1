@@ -3,23 +3,40 @@ const fs = require("fs");
 const path = require("path");
 const { getUserFromRequest } = require("../../../../lib/auth");
 
+function safeInside(baseDir, targetPath) {
+  const base = path.resolve(baseDir);
+  const target = path.resolve(targetPath);
+  return target.startsWith(base + path.sep);
+}
+
 async function POST(req) {
   const user = getUserFromRequest(req);
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "unauth" }, { status: 401 });
 
   const body = await req.json();
-  const target = String(body.path || "");
-  if (!target) return NextResponse.json({ error: "path wajib" }, { status: 400 });
+  const p = String(body.path || "").trim();
+  if (!p) return NextResponse.json({ error: "path required" }, { status: 400 });
 
-  const root = path.resolve(process.env.UPLOAD_DIR || "./uploads_storage");
-  const full = path.resolve(target);
+  const uploadRoot = process.env.UPLOAD_DIR || "./uploads_storage";
 
-  if (!full.startsWith(root)) {
-    return NextResponse.json({ error: "Forbidden path" }, { status: 403 });
+  // hanya boleh hapus file yang ada di folder uploadRoot
+  if (!safeInside(uploadRoot, p)) {
+    return NextResponse.json({ error: "forbidden path" }, { status: 403 });
   }
 
-  if (fs.existsSync(full)) fs.unlinkSync(full);
-  return NextResponse.json({ ok: true });
+  try {
+    if (!fs.existsSync(p)) {
+      return NextResponse.json({ error: "file not found" }, { status: 404 });
+    }
+    const st = fs.statSync(p);
+    if (!st.isFile()) {
+      return NextResponse.json({ error: "not a file" }, { status: 400 });
+    }
+    fs.unlinkSync(p);
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
+  }
 }
 
 module.exports = { POST };
